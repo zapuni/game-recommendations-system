@@ -17,7 +17,7 @@ class SteamCrawler:
         self.store_url = "https://store.steampowered.com/api/appdetails"
         self.spy_url = "https://steamspy.com/api.php"
         self.app_list_url = "https://api.steampowered.com/IStoreService/GetAppList/v1/"
-        self.output_dir = "data"
+        self.output_dir = "data/steam-store-games"
         self.applist_file = "data/steam_all_app.csv"
         
         # Danh sách tất cả tags có thể có (dựa trên form)
