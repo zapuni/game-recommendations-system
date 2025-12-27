@@ -1,0 +1,37 @@
+{
+  "metadata": {
+    "timestamp": "2025-12-27T15:03:09.647060",
+    "n_samples": 1000,
+    "k_value": 10,
+    "total_games": 20024
+  },
+  "ranking_metrics": [
+    {
+      "model": "Content-Based (Cosine Similarity)",
+      "avg_precision_at_k": 0.7175,
+      "avg_recall_at_k": 0.9,
+      "avg_ndcg_at_k": 0.8339910976672211,
+      "samples_tested": 1000,
+      "rmse": 0.2996633100955229,
+      "mae": 0.2669929666144585
+    },
+    {
+      "model": "Hybrid (Content + Quality)",
+      "avg_precision_at_k": 0.6705,
+      "avg_recall_at_k": 0.861,
+      "avg_ndcg_at_k": 0.7835737823165936,
+      "samples_tested": 1000,
+      "rmse": 0.2996633100955229,
+      "mae": 0.2669929666144585
+    },
+    {
+      "model": "Popularity Baseline",
+      "avg_precision_at_k": 0.0143,
+      "avg_recall_at_k": 0.096,
+      "avg_ndcg_at_k": 0.03707361635912829,
+      "samples_tested": 1000,
+      "rmse": 0.1917887698503103,
+      "mae": 0.15528173112996776
+    }
+  ]
+}

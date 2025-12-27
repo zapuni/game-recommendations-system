@@ -1,0 +1,51 @@
+# --- Python & Environment ---
+**/__pycache__/
+**/*.py[cod]
+*$py.class
+**/.env
+**/.venv
+**/env/
+**/venv/
+**/ENV/
+**/build/
+**/dist/
+**/*.spec
+
+# --- Data & Machine Learning ---
+**/docs
+**/data/
+**/*.csv
+*.parquet
+**/*.pkl
+**/*.joblib
+**/*.npy
+**/*.npz
+**/steam-store-games/
+**/models/
+**/output/
+**/artifacts/
+
+# --- Results (keep evaluation results) ---
+# results/ directory is tracked for evaluation results
+
+# --- Streamlit & Web ---
+**/.streamlit/config.toml
+**/.streamlit/secrets.toml
+
+# --- Database (MongoDB) ---
+**/dump/
+**/*.gz
+**/mongo_data/
+
+# --- Logs & Performance ---
+**/*.log
+**/logs/
+**/.pytest_cache/
+**/.ipynb_checkpoints/
+
+# --- IDEs & OS ---
+**/.vscode/
+**/.idea/
+**/.DS_Store
+**/.Thumbs.db
+**/.desktop.ini
