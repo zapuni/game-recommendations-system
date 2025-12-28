@@ -362,7 +362,7 @@ class ContextAwareRecommender:
             
             game = game_info.iloc[0]
             genres = str(game['genres'])
-            primary_genre = genres.split(',')[0].strip()
+            primary_genre = genres.split(';')[0].strip()
             
             # Base score
             base_score = rec.get('hybrid_score', rec.get('quality_score', 0.5))

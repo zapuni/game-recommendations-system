@@ -261,7 +261,7 @@ class DeviceCompatibilityChecker:
         Returns:
             Tuple of (is_compatible, compatibility_score, message)
         """
-        genres = [g.strip() for g in game_genres.split(',')]
+        genres = [g.strip() for g in game_genres.split(';')]
         primary_genre = genres[0] if genres else "Indie"
         
         # Get requirements for primary genre

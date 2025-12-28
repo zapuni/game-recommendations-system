@@ -293,7 +293,7 @@ class ModelEvaluator:
                 continue
             
             game = self.games_df[self.games_df['appid'] == game_appid].iloc[0]
-            game_genre = set(str(game['genres']).split(','))
+            game_genre = set(str(game['genres']).split(';'))
             
             recommendations = recommender.content_based_recommend(game_appid, n_recommendations=k)
             recommended_ids = [r['appid'] for r in recommendations]
@@ -303,7 +303,7 @@ class ModelEvaluator:
             for rec_id in recommended_ids:
                 rec_game = self.games_df[self.games_df['appid'] == rec_id]
                 if not rec_game.empty:
-                    rec_genres = set(str(rec_game.iloc[0]['genres']).split(','))
+                    rec_genres = set(str(rec_game.iloc[0]['genres']).split(';'))
                     if len(rec_genres.intersection(game_genre)) > 0:
                         relevant_games.add(rec_id)
             
@@ -355,7 +355,7 @@ class ModelEvaluator:
                 continue
             
             game = self.games_df[self.games_df['appid'] == game_appid].iloc[0]
-            game_genre = set(str(game['genres']).split(','))
+            game_genre = set(str(game['genres']).split(';'))
             
             recommendations = recommender.hybrid_recommend(
                 game_appid,
@@ -369,7 +369,7 @@ class ModelEvaluator:
             for rec_id in recommended_ids:
                 rec_game = self.games_df[self.games_df['appid'] == rec_id]
                 if not rec_game.empty:
-                    rec_genres = set(str(rec_game.iloc[0]['genres']).split(','))
+                    rec_genres = set(str(rec_game.iloc[0]['genres']).split(';'))
                     if len(rec_genres.intersection(game_genre)) > 0:
                         relevant_games.add(rec_id)
             
@@ -423,13 +423,13 @@ class ModelEvaluator:
             if game.empty:
                 continue
             
-            game_genre = set(str(game.iloc[0]['genres']).split(','))
+            game_genre = set(str(game.iloc[0]['genres']).split(';'))
             
             relevant_games = set()
             for rec_id in top_games:
                 rec_game = self.games_df[self.games_df['appid'] == rec_id]
                 if not rec_game.empty:
-                    rec_genres = set(str(rec_game.iloc[0]['genres']).split(','))
+                    rec_genres = set(str(rec_game.iloc[0]['genres']).split(';'))
                     if len(rec_genres.intersection(game_genre)) > 0:
                         relevant_games.add(rec_id)
             
@@ -487,7 +487,7 @@ class ModelEvaluator:
                 continue
             
             game = self.games_df[self.games_df['appid'] == game_appid].iloc[0]
-            game_genre = set(str(game['genres']).split(','))
+            game_genre = set(str(game['genres']).split(';'))
             
             # Update context with recently viewed
             sample_context['recently_viewed'] = [game_appid]
@@ -506,7 +506,7 @@ class ModelEvaluator:
             for rec_id in recommended_ids:
                 rec_game = self.games_df[self.games_df['appid'] == rec_id]
                 if not rec_game.empty:
-                    rec_genres = set(str(rec_game.iloc[0]['genres']).split(','))
+                    rec_genres = set(str(rec_game.iloc[0]['genres']).split(';'))
                     if len(rec_genres.intersection(game_genre)) > 0:
                         relevant_games.add(rec_id)
             

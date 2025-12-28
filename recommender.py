@@ -15,6 +15,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import TfidfVectorizer
 from typing import List, Tuple, Dict, Optional
+from pathlib import Path
+import hashlib
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -27,6 +29,9 @@ except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
     print("Note: sentence-transformers not installed. Using TF-IDF embeddings.")
 
+# Cache directory for embeddings
+CACHE_DIR = Path("data/embeddings_cache")
+
 
 class EmbeddingManager:
     """
@@ -35,6 +40,7 @@ class EmbeddingManager:
     Supports:
     - TF-IDF: Fast, lightweight text vectorization
     - Sentence Transformers (BERT): Semantic understanding
+    - Caching: Save/load embeddings to avoid recomputation
     """
     
     def __init__(self, embedding_type: str = "tfidf"):
@@ -50,7 +56,7 @@ class EmbeddingManager:
         
         if embedding_type == "bert" and SENTENCE_TRANSFORMERS_AVAILABLE:
             # Use a lightweight multilingual model
-            self.model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+            self.model = SentenceTransformer('sentence-transformers/paraphrase-MiniLM-L6-v2')
         elif embedding_type == "bert":
             print("Warning: BERT requested but not available. Falling back to TF-IDF.")
             self.embedding_type = "tfidf"
@@ -70,7 +76,7 @@ class EmbeddingManager:
             truncated_texts = [t[:500] if t else "" for t in texts]
             self.embeddings = self.model.encode(
                 truncated_texts, 
-                show_progress_bar=False,
+                show_progress_bar=True,
                 batch_size=32
             )
         else:
@@ -91,6 +97,193 @@ class EmbeddingManager:
         return 0
 
 
+class EmbeddingCache:
+    """
+    Manages caching of embedding matrices to disk.
+    
+    Saves embeddings as .npy files to avoid recomputation on app restart.
+    Uses hash of game appids to detect data changes.
+    """
+    
+    def __init__(self, cache_dir: Path = CACHE_DIR):
+        """
+        Initialize embedding cache.
+        
+        Args:
+            cache_dir: Directory to store cache files
+        """
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+    
+    def _get_data_hash(self, appids: List[int]) -> str:
+        """
+        Generate hash from appids to detect data changes.
+        
+        Args:
+            appids: List of game appids
+        
+        Returns:
+            MD5 hash string (first 8 chars)
+        """
+        appids_str = ",".join(map(str, sorted(appids)))
+        return hashlib.md5(appids_str.encode()).hexdigest()[:8]
+    
+    def _get_cache_path(self, embedding_type: str, data_hash: str) -> Path:
+        """
+        Get cache file path for given embedding type and data hash.
+        
+        Args:
+            embedding_type: 'tfidf' or 'bert'
+            data_hash: Hash of the data
+        
+        Returns:
+            Path to cache file
+        """
+        filename = f"embeddings_{embedding_type}_{data_hash}.npy"
+        return self.cache_dir / filename
+    
+    def _get_similarity_cache_path(self, embedding_type: str, data_hash: str) -> Path:
+        """
+        Get similarity matrix cache file path.
+        
+        Args:
+            embedding_type: 'tfidf' or 'bert'
+            data_hash: Hash of the data
+        
+        Returns:
+            Path to similarity cache file
+        """
+        filename = f"similarity_{embedding_type}_{data_hash}.npy"
+        return self.cache_dir / filename
+    
+    def exists(self, embedding_type: str, appids: List[int]) -> bool:
+        """
+        Check if cache exists for given embedding type and data.
+        
+        Args:
+            embedding_type: 'tfidf' or 'bert'
+            appids: List of game appids
+        
+        Returns:
+            True if cache exists and is valid
+        """
+        data_hash = self._get_data_hash(appids)
+        cache_path = self._get_cache_path(embedding_type, data_hash)
+        return cache_path.exists()
+    
+    def load(self, embedding_type: str, appids: List[int]) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+        """
+        Load embeddings and similarity matrix from cache.
+        
+        Args:
+            embedding_type: 'tfidf' or 'bert'
+            appids: List of game appids
+        
+        Returns:
+            Tuple of (embeddings, similarity_matrix) or (None, None) if not found
+        """
+        data_hash = self._get_data_hash(appids)
+        embeddings_path = self._get_cache_path(embedding_type, data_hash)
+        similarity_path = self._get_similarity_cache_path(embedding_type, data_hash)
+        
+        try:
+            if embeddings_path.exists():
+                embeddings = np.load(embeddings_path)
+                
+                # Validate size matches
+                if embeddings.shape[0] != len(appids):
+                    print(f"[CACHE] Size mismatch: cache has {embeddings.shape[0]}, need {len(appids)}")
+                    return None, None
+                
+                # Load similarity matrix if exists
+                similarity_matrix = None
+                if similarity_path.exists():
+                    similarity_matrix = np.load(similarity_path)
+                
+                print(f"[CACHE] Loaded {embedding_type.upper()} embeddings from cache ({embeddings.shape})")
+                return embeddings, similarity_matrix
+        except Exception as e:
+            print(f"[CACHE] Error loading cache: {e}")
+        
+        return None, None
+    
+    def save(self, embedding_type: str, appids: List[int], 
+             embeddings: np.ndarray, similarity_matrix: Optional[np.ndarray] = None) -> bool:
+        """
+        Save embeddings and optionally similarity matrix to cache.
+        
+        Args:
+            embedding_type: 'tfidf' or 'bert'
+            appids: List of game appids
+            embeddings: Embedding matrix to save
+            similarity_matrix: Optional similarity matrix to save
+        
+        Returns:
+            True if saved successfully
+        """
+        data_hash = self._get_data_hash(appids)
+        embeddings_path = self._get_cache_path(embedding_type, data_hash)
+        
+        try:
+            np.save(embeddings_path, embeddings)
+            print(f"[CACHE] Saved {embedding_type.upper()} embeddings to {embeddings_path}")
+            
+            # Save similarity matrix too
+            if similarity_matrix is not None:
+                similarity_path = self._get_similarity_cache_path(embedding_type, data_hash)
+                np.save(similarity_path, similarity_matrix)
+                print(f"[CACHE] Saved similarity matrix to {similarity_path}")
+            
+            return True
+        except Exception as e:
+            print(f"[CACHE] Error saving cache: {e}")
+            return False
+    
+    def clear(self, embedding_type: Optional[str] = None) -> int:
+        """
+        Clear cache files.
+        
+        Args:
+            embedding_type: Optional - clear only this type, or all if None
+        
+        Returns:
+            Number of files deleted
+        """
+        count = 0
+        pattern = f"*_{embedding_type}_*.npy" if embedding_type else "*.npy"
+        
+        for file in self.cache_dir.glob(pattern):
+            file.unlink()
+            count += 1
+        
+        print(f"[CACHE] Cleared {count} cache files")
+        return count
+    
+    def get_cache_info(self) -> Dict:
+        """
+        Get information about cached files.
+        
+        Returns:
+            Dictionary with cache statistics
+        """
+        info = {
+            'cache_dir': str(self.cache_dir),
+            'files': [],
+            'total_size_mb': 0
+        }
+        
+        for file in self.cache_dir.glob("*.npy"):
+            size_mb = file.stat().st_size / (1024 * 1024)
+            info['files'].append({
+                'name': file.name,
+                'size_mb': round(size_mb, 2)
+            })
+            info['total_size_mb'] += size_mb
+        
+        info['total_size_mb'] = round(info['total_size_mb'], 2)
+        return info
+
+
 class RecommenderSystem:
     """
     Unified recommender system with multiple algorithms.
@@ -103,7 +296,7 @@ class RecommenderSystem:
     - Genre-based: Filter by genre with quality ranking
     """
     
-    def __init__(self, games_df: pd.DataFrame, embedding_type: str = "tfidf"):
+    def __init__(self, games_df: pd.DataFrame, embedding_type: str = "bert"):
         """
         Initialize recommender system.
         
@@ -557,30 +750,85 @@ class RecommenderSystem:
             n_recommendations=n_recommendations
         )
     
-    def create_advanced_embeddings(self, use_bert: bool = False) -> np.ndarray:
+    def create_advanced_embeddings(self, use_bert: bool = False, use_cache: bool = True) -> np.ndarray:
         """
-        Create advanced embeddings for all games.
+        Create advanced embeddings for all games with caching support.
         
         Args:
             use_bert: Whether to use BERT-based embeddings
+            use_cache: Whether to use cached embeddings if available
         
         Returns:
             Embedding matrix
         """
+        embedding_type = "bert" if use_bert else "tfidf"
+        appids = self.games_df['appid'].tolist()
+        
+        # Initialize cache
+        cache = EmbeddingCache()
+        
+        # Try to load from cache first
+        if use_cache:
+            cached_embeddings, cached_similarity = cache.load(embedding_type, appids)
+            
+            if cached_embeddings is not None:
+                self.content_matrix = cached_embeddings
+                self.embedding_manager = EmbeddingManager(embedding_type)
+                self.embedding_manager.embeddings = cached_embeddings
+                
+                if cached_similarity is not None:
+                    self.similarity_matrix = cached_similarity
+                    print(f"[CACHE] Loaded similarity matrix from cache")
+                else:
+                    self._compute_similarity_matrix()
+                    # Save the computed similarity matrix
+                    cache.save(embedding_type, appids, cached_embeddings, self.similarity_matrix)
+                
+                return cached_embeddings
+        
+        # Cache miss - compute embeddings
+        print(f"[INFO] Computing {embedding_type.upper()} embeddings...")
+        
         # Combine text features
         texts = []
         for _, row in self.games_df.iterrows():
             text = f"{row.get('genres', '')} {row.get('categories', '')} {row.get('short_description', '')}"
             texts.append(text[:500])  # Truncate to avoid memory issues
         
-        embedding_type = "bert" if use_bert else "tfidf"
         self.embedding_manager = EmbeddingManager(embedding_type)
         embeddings = self.embedding_manager.fit_transform(texts)
         
         self.content_matrix = embeddings
         self._compute_similarity_matrix()
         
+        # Save to cache
+        if use_cache:
+            cache.save(embedding_type, appids, embeddings, self.similarity_matrix)
+        
         return embeddings
+    
+    def clear_embedding_cache(self, embedding_type: Optional[str] = None) -> int:
+        """
+        Clear cached embeddings.
+        
+        Args:
+            embedding_type: 'tfidf', 'bert', or None for all
+        
+        Returns:
+            Number of files deleted
+        """
+        cache = EmbeddingCache()
+        return cache.clear(embedding_type)
+    
+    def get_cache_info(self) -> Dict:
+        """
+        Get information about cached embeddings.
+        
+        Returns:
+            Dictionary with cache statistics
+        """
+        cache = EmbeddingCache()
+        return cache.get_cache_info()
 
 
 print("RecommenderSystem class ready!")

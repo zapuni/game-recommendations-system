@@ -22,26 +22,6 @@ import numpy as np
 from data_processor import DataProcessor
 from recommender import RecommenderSystem
 from evaluator import ModelEvaluator
-from sklearn.feature_extraction.text import TfidfVectorizer
-
-
-def get_content_features(df):
-    """Extract content features using TF-IDF vectorization."""
-    df_copy = df.copy()
-    df_copy['combined_features'] = (
-        df_copy['genres'].fillna('') + ' ' +
-        df_copy['categories'].fillna('') + ' ' +
-        df_copy['primary_genre'].fillna('')
-    )
-    
-    tfidf = TfidfVectorizer(
-        max_features=50,
-        stop_words='english',
-        ngram_range=(1, 2)
-    )
-    
-    feature_matrix = tfidf.fit_transform(df_copy['combined_features']).toarray()
-    return feature_matrix, df['appid'].tolist(), df['name'].tolist()
 
 
 def load_data():
@@ -60,13 +40,28 @@ def load_data():
     return processor, df, df_filtered
 
 
-def initialize_recommender(df_filtered):
-    """Initialize the recommender system."""
-    print("[INFO] Initializing recommender system...")
-    recommender = RecommenderSystem(df_filtered)
-    feature_matrix, appids, names = get_content_features(df_filtered)
-    recommender.set_content_features(feature_matrix)
-    print("[OK] Recommender system initialized")
+def initialize_recommender(df_filtered, use_bert: bool = False, use_cache: bool = True):
+    """
+    Initialize the recommender system using EmbeddingManager.
+    
+    Args:
+        df_filtered: Filtered DataFrame with game data
+        use_bert: If True, use BERT embeddings (384D). If False, use TF-IDF (100D).
+        use_cache: If True, use cached embeddings if available.
+    
+    Returns:
+        Initialized RecommenderSystem with computed similarity matrix
+    """
+    embedding_name = "BERT" if use_bert else "TF-IDF"
+    cache_status = "enabled" if use_cache else "disabled"
+    print(f"[INFO] Initializing recommender system with {embedding_name} embeddings (cache: {cache_status})...")
+    
+    recommender = RecommenderSystem(df_filtered, embedding_type="bert" if use_bert else "tfidf")
+    # Use EmbeddingManager through create_advanced_embeddings
+    recommender.create_advanced_embeddings(use_bert=use_bert, use_cache=use_cache)
+    
+    embedding_dim = recommender.embedding_manager.get_embedding_dim()
+    print(f"[OK] Recommender system initialized (embedding dim: {embedding_dim})")
     return recommender
 
 
@@ -195,6 +190,7 @@ def main():
 Examples:
     python run_evaluation.py
     python run_evaluation.py --samples 100 --k 10
+    python run_evaluation.py --bert  # Use BERT embeddings
     python run_evaluation.py --output results/my_eval.json
         """
     )
@@ -220,13 +216,30 @@ Examples:
         help='Output file path (default: results/evaluation_results.json)'
     )
     
+    parser.add_argument(
+        '--bert', '-b',
+        action='store_true',
+        help='Use BERT embeddings instead of TF-IDF (slower but better semantic understanding)'
+    )
+    
+    parser.add_argument(
+        '--no-cache',
+        action='store_true',
+        help='Force rebuild embeddings without using cache'
+    )
+    
     args = parser.parse_args()
+    
+    embedding_name = "BERT (384D)" if args.bert else "TF-IDF (100D)"
+    use_cache = not args.no_cache
     
     print("=" * 70)
     print("MODEL EVALUATION SCRIPT")
     print("=" * 70)
     print(f"Samples: {args.samples}")
     print(f"K value: {args.k}")
+    print(f"Embedding: {embedding_name}")
+    print(f"Use Cache: {use_cache}")
     print(f"Output: {args.output}")
     print("=" * 70)
     
@@ -234,11 +247,15 @@ Examples:
         # Load data
         processor, df, df_filtered = load_data()
         
-        # Initialize recommender
-        recommender = initialize_recommender(df_filtered)
+        # Initialize recommender with selected embedding type and cache option
+        recommender = initialize_recommender(df_filtered, use_bert=args.bert, use_cache=use_cache)
         
         # Run evaluation
         results = run_evaluation(df_filtered, recommender, args.samples, args.k)
+        
+        # Add embedding info to metadata
+        results['metadata']['embedding_type'] = "bert" if args.bert else "tfidf"
+        results['metadata']['embedding_dim'] = recommender.embedding_manager.get_embedding_dim()
         
         # Save results
         save_results(results, args.output)

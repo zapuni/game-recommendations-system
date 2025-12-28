@@ -178,33 +178,23 @@ def load_data():
 
 
 @st.cache_resource
-def initialize_recommender(_df_filtered):
-    """Initialize the recommender system."""
-    recommender = RecommenderSystem(_df_filtered)
-    feature_matrix, appids, names = get_content_features(_df_filtered)
-    recommender.set_content_features(feature_matrix)
+def initialize_recommender(_df_filtered, use_bert: bool = False):
+    """
+    Initialize the recommender system with embeddings.
+    
+    Args:
+        _df_filtered: Filtered DataFrame with game data
+        use_bert: If True, use BERT embeddings (slower but better semantic understanding)
+                  If False, use TF-IDF embeddings (faster, lightweight)
+    
+    Returns:
+        Initialized RecommenderSystem with computed similarity matrix
+    """
+    recommender = RecommenderSystem(_df_filtered, embedding_type="bert" if use_bert else "tfidf")
+    # Use EmbeddingManager through create_advanced_embeddings
+    # This handles both BERT (384D) and TF-IDF (100D) embeddings automatically
+    recommender.create_advanced_embeddings(use_bert=use_bert)
     return recommender
-
-
-def get_content_features(df):
-    """Extract content features using TF-IDF vectorization."""
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    
-    df_copy = df.copy()
-    df_copy['combined_features'] = (
-        df_copy['genres'].fillna('') + ' ' +
-        df_copy['categories'].fillna('') + ' ' +
-        df_copy['primary_genre'].fillna('')
-    )
-    
-    tfidf = TfidfVectorizer(
-        max_features=50,
-        stop_words='english',
-        ngram_range=(1, 2)
-    )
-    
-    feature_matrix = tfidf.fit_transform(df_copy['combined_features']).toarray()
-    return feature_matrix, df['appid'].tolist(), df['name'].tolist()
 
 
 def get_auth_manager():
@@ -1175,7 +1165,7 @@ def page_data_analytics(processor, df_filtered):
     with tab3:
         genre_counts = {}
         for genres_str in df_filtered['genres'].dropna():
-            for genre in str(genres_str).split(','):
+            for genre in str(genres_str).split(';'):
                 genre = genre.strip()
                 genre_counts[genre] = genre_counts.get(genre, 0) + 1
         
@@ -1496,10 +1486,69 @@ def main():
     # Render header
     render_header()
     
+    # Sidebar - Embedding Configuration (must be before data loading for cache key)
+    st.sidebar.markdown("## Settings")
+    
+    # Embedding type selection
+    embedding_options = {
+        "TF-IDF (Fast)": False,
+        "BERT (Semantic)": True
+    }
+    selected_embedding = st.sidebar.selectbox(
+        "Embedding Model",
+        options=list(embedding_options.keys()),
+        index=1,  # Default to BERT for better quality
+        help="TF-IDF: Fast, lightweight (~100D). BERT: Better semantic understanding (~384D), but slower."
+    )
+    use_bert = embedding_options[selected_embedding]
+    
+    # Show embedding info
+    if use_bert:
+        st.sidebar.caption("Using BERT embeddings (384D) - Better quality, slower")
+    else:
+        st.sidebar.caption("Using TF-IDF embeddings (100D) - Fast and lightweight")
+    
+    # Cache management in expander
+    with st.sidebar.expander("Cache Settings", expanded=False):
+        st.caption("Embeddings are cached to speed up loading")
+        
+        if st.button("Clear Embedding Cache", key="clear_cache_btn"):
+            # Import here to avoid circular import at module level
+            from recommender import EmbeddingCache
+            cache = EmbeddingCache()
+            count = cache.clear()
+            st.success(f"Cleared {count} cache files!")
+            st.cache_resource.clear()
+            st.rerun()
+        
+        # Show cache info
+        try:
+            from recommender import EmbeddingCache
+            cache = EmbeddingCache()
+            cache_info = cache.get_cache_info()
+            if cache_info['files']:
+                st.caption(f"Cache size: {cache_info['total_size_mb']} MB")
+                for f in cache_info['files']:
+                    st.caption(f"• {f['name']} ({f['size_mb']} MB)")
+            else:
+                st.caption("No cached files")
+        except Exception:
+            pass
+    
+    st.sidebar.divider()
+    
     # Load data
     with st.spinner("Loading Steam data..."):
         processor, df, df_filtered = load_data()
-        recommender = initialize_recommender(df_filtered)
+    
+    # Initialize recommender with selected embedding type
+    with st.spinner(f"Initializing recommender with {selected_embedding}..."):
+        recommender = initialize_recommender(df_filtered, use_bert=use_bert)
+    
+    # Show cache status after initialization
+    embedding_dim = recommender.embedding_manager.get_embedding_dim()
+    if embedding_dim > 0:
+        st.sidebar.success(f"✓ Embeddings loaded ({embedding_dim}D)")
     
     # Get username if logged in
     username = None

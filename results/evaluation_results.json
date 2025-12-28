@@ -1,37 +1,39 @@
 {
   "metadata": {
-    "timestamp": "2025-12-27T15:03:09.647060",
-    "n_samples": 1000,
+    "timestamp": "2025-12-28T16:44:21.561313",
+    "n_samples": 50,
     "k_value": 10,
-    "total_games": 20024
+    "total_games": 20024,
+    "embedding_type": "tfidf",
+    "embedding_dim": 100
   },
   "ranking_metrics": [
     {
       "model": "Content-Based (Cosine Similarity)",
-      "avg_precision_at_k": 0.7175,
-      "avg_recall_at_k": 0.9,
-      "avg_ndcg_at_k": 0.8339910976672211,
-      "samples_tested": 1000,
-      "rmse": 0.2996633100955229,
-      "mae": 0.2669929666144585
+      "avg_precision_at_k": 0.934,
+      "avg_recall_at_k": 1.0,
+      "avg_ndcg_at_k": 0.977929907152841,
+      "samples_tested": 50,
+      "rmse": 0.3163612887142362,
+      "mae": 0.27646389086562995
     },
     {
       "model": "Hybrid (Content + Quality)",
-      "avg_precision_at_k": 0.6705,
-      "avg_recall_at_k": 0.861,
-      "avg_ndcg_at_k": 0.7835737823165936,
-      "samples_tested": 1000,
-      "rmse": 0.2996633100955229,
-      "mae": 0.2669929666144585
+      "avg_precision_at_k": 0.91,
+      "avg_recall_at_k": 1.0,
+      "avg_ndcg_at_k": 0.9612362787996812,
+      "samples_tested": 50,
+      "rmse": 0.3163612887142362,
+      "mae": 0.27646389086562995
     },
     {
       "model": "Popularity Baseline",
-      "avg_precision_at_k": 0.0143,
-      "avg_recall_at_k": 0.096,
-      "avg_ndcg_at_k": 0.03707361635912829,
-      "samples_tested": 1000,
-      "rmse": 0.1917887698503103,
-      "mae": 0.15528173112996776
+      "avg_precision_at_k": 0.488,
+      "avg_recall_at_k": 0.98,
+      "avg_ndcg_at_k": 0.7150150572072856,
+      "samples_tested": 50,
+      "rmse": 0.20682980403247073,
+      "mae": 0.17703860544434094
     }
   ]
 }

@@ -160,7 +160,7 @@ class DataProcessor:
         df['game_age_days'] = (pd.Timestamp.now() - df['release_date']).dt.days.fillna(0)
         
         # Extract primary genre (first genre listed)
-        df['primary_genre'] = df['genres'].str.split(',').str[0].str.strip()
+        df['primary_genre'] = df['genres'].str.split(';').str[0].str.strip()
         
         # Price category
         df['price_category'] = pd.cut(

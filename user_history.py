@@ -321,7 +321,7 @@ class UserHistory:
         if not genres_str:
             return
         
-        genres = [g.strip() for g in str(genres_str).split(',')]
+        genres = [g.strip() for g in str(genres_str).split(';')]
         favorite_genres = self.data["preferences"]["favorite_genres"]
         
         for genre in genres:
@@ -429,7 +429,7 @@ class UserHistory:
         # Count genre frequencies
         genre_counts = {}
         for game in viewed:
-            for genre in str(game.get("genres", "")).split(','):
+            for genre in str(game.get("genres", "")).split(';'):
                 genre = genre.strip()
                 if genre:
                     genre_counts[genre] = genre_counts.get(genre, 0) + 1
